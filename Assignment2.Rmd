@@ -1,0 +1,9 @@
+---
+title: "Assignment 1"
+author: "Emmanuella Ekpenyong (2696204), Fie Bergli (2902784) & Britta Abbink Spaink (2772949)"
+date: "15 February 2026"
+output: pdf_document
+fontsize: 11pt
+highlight: tango
+---
+
