@@ -24,6 +24,137 @@ fisher.test(table_smoke)
 ```
 The Fisher's test gives a p-value of 0.187. As our confidence level is a = 0.05, we see that 0.187 > 0.05. This result fails to reject the null hypothesis, which means there is no statistically significant relationship between maternal smoking anf low birth weight in this dataset. 
 
+## Exercise 2 
+
+## 2a) Study the data by giving a few summaries (graphical or tables), make preliminary comments related to the main question.
+```{r}
+custody <- read.table("custody.txt", header = TRUE)
+
+custody$Indigenous <- as.factor(custody$Indigenous)
+
+summary(custody)
+
+aggregate(cbind(Deaths, Prisoners) ~ Indigenous, data = custody, sum)
+```
+```{r}
+custody$DeathRate <- custody$Deaths / custody$Prisoners
+aggregate(DeathRate ~ Year + Indigenous, data = custody, mean)
+aggregate(DeathRate ~ Indigenous, data = custody, mean)
+```
+
+```{r}
+# split the data
+indig <- subset(custody, Indigenous == "Yes")
+nonindig <- subset(custody, Indigenous == "No")
+
+# plot first line
+plot(indig$Year, indig$DeathRate,
+     type = "o", pch = 19, col = "red",
+     ylim = range(custody$DeathRate),
+     xlab = "Year", ylab = "Death rate")
+
+# add second line
+lines(nonindig$Year, nonindig$DeathRate,
+      type = "o", pch = 19, col = "blue")
+
+# add legend
+legend("topleft",
+       legend = c("Indigenous", "Non-Indigenous"),
+       col = c("red", "blue"),
+       pch = 19,
+       lty = 1)
+```
+The number of prisoners increases slightly from 1990 to 1995 for both Indigenous and non-Indigenous groups, although the Indigenous prison population is much smaller. The number of deaths fluctuates across years, with higher raw counts for non-Indigenous prisoners due to their much larger prison population. A more informative measure is the death rate (Deaths/Prisoners). The exploratory analysis suggests that the death rate is generally higher for Indigenous prisoners, although it varies considerably from year to year. These observations motivate a formal statistical analysis using logistic regression to determine whether the difference between the groups is statistically significant.
+
+## 2b) To address the main question, fit a logistic regression model by modelling the number of deaths (among prisoners) as response, Year as a continues predictor and Indigenous as a factor predictor, for now insisting on presence of both predictors. Is there an interaction between Year and Indigenous?
+
+```{r}
+model1 <- glm(cbind(Deaths, Prisoners - Deaths) ~ Year + Indigenous,
+              data = custody,
+              family = binomial)
+
+summary(model1)
+```
+
+```{r}
+model2 <- glm(cbind(Deaths, Prisoners - Deaths) ~ Year * Indigenous,
+              data = custody,
+              family = binomial)
+
+anova(model1, model2, test = "Chisq")
+```
+A logistic regression model was fitted with the number of deaths among prisoners as the response variable, with Year as a continuous predictor and Indigenous status as a factor predictor. An additional model including the interaction between Year and Indigenous was fitted to test whether the time trend differs between the groups. A likelihood ratio test comparing the models gave a p-value of 0.2617. Since this is greater than 0.05, the interaction is not statistically significant. Therefore, there is no evidence that the effect of Year differs between Indigenous and non-Indigenous prisoners.
+
+## 2c) For the model from b), estimate the relative change in the odds (odds ratio) of death in custody from non-indigenous to indigenous group. What is the interpretation of this number? Does it depend on year? Demonstrate the eﬀect of Year and Indigenous by plotting the odds from 1990 to 1995 for both groups, Indigenous and non-Indigenous, on the same plot. Comment.
+```{r}
+exp(coef(model1)["IndigenousYes"])
+```
+The estimated odds ratio is 1.29, indicating that the odds of death in custody for Indigenous prisoners are approximately 29% higher than for non-Indigenous prisoners, holding Year constant. Since the interaction between Year and Indigenous was not statistically significant, the odds ratio does not depend on year. Thus, the relative difference between the two groups remains constant over the observed time period.
+```{r}
+years <- 1990:1995
+
+newdata_yes <- data.frame(Year = years, Indigenous = "Yes")
+newdata_no  <- data.frame(Year = years, Indigenous = "No")
+
+p_yes <- predict(model1, newdata_yes, type = "response")
+p_no  <- predict(model1, newdata_no, type = "response")
+
+# convert probabilities to odds
+odds_yes <- p_yes/(1-p_yes)
+odds_no  <- p_no/(1-p_no)
+
+# plot 
+plot(years, odds_yes, type="o", col="red", pch=19,
+     ylim=range(c(odds_yes, odds_no)),
+     xlab="Year", ylab="Odds of death in custody")
+
+lines(years, odds_no, type="o", col="blue", pch=19)
+
+legend("topleft",
+       legend=c("Indigenous","Non-Indigenous"),
+       col=c("red","blue"),
+       pch=19,
+       lty=1)
+```
+The predicted odds from 1990 to 1995 were plotted for both groups, showing higher odds for Indigenous prisoners across all years. The difference between the groups remains approximately constant over time.
+
+
+## 2d) Try to extend the model in b) by including Population (use at most one interaction term per model). Is it a good idea to include the variable Population? Using all the results obtained so far, choose (and justify) a resulting model. Comment on your findings.
+
+```{r}
+model_pop <- glm(cbind(Deaths, Prisoners - Deaths) ~ Year + Indigenous + Population,
+                 data = custody,
+                 family = binomial)
+
+anova(model1, model_pop, test="Chisq")
+```
+```{r}
+model_pop_int <- glm(cbind(Deaths, Prisoners - Deaths) ~ Year + Indigenous + Population + Indigenous:Population,
+                     data = custody,
+                     family = binomial)
+
+anova(model_pop, model_pop_int, test="Chisq")
+```
+The model from part (b) was extended by including Population as an additional predictor. A likelihood ratio test comparing the models with and without Population gave a p-value of 0.2524, indicating that Population does not significantly improve the model. An additional model including the interaction between Indigenous and Population was also considered, but this interaction was not statistically significant (p = 0.8988). Since neither Population nor the interaction term improved the model, their inclusion is not justified. Therefore, the final model includes only Year and Indigenous as predictors, which is the simplest model not contradicted by the data.
+
+## 2e) Now investigate whether the predictors Year and Indigenous have eﬀect on the proportion of prisoners (relative to the Population). Should the interaction be used in the model?
+```{r}
+model_prison <- glm(cbind(Prisoners, Population - Prisoners) ~ Year + Indigenous,
+                    data = custody,
+                    family = binomial)
+
+model_prison_int <- glm(cbind(Prisoners, Population - Prisoners) ~ Year * Indigenous,
+                        data = custody,
+                        family = binomial)
+
+anova(model_prison, model_prison_int, test="Chisq")
+```
+To investigate whether Year and Indigenous status affect the proportion of prisoners relative to the population, a logistic regression model was fitted with the number of prisoners among the population as the response variable and Year and Indigenous as predictors. A second model including the interaction between Year and Indigenous was also fitted. A likelihood ratio test comparing the models gave a p-value of 4.418e-08, indicating that the interaction term is highly significant. This suggests that the change over time in the proportion of prisoners differs between Indigenous and non-Indigenous populations. Therefore, the interaction between Year and Indigenous should be included in the model.
+
+## 2f) Combine all your findings so far to present your final conclusion(s) for the Royal Commission on Aboriginal Deaths in Custody.
+The exploratory analysis suggested that the death rate among prisoners is generally higher for Indigenous prisoners than for non-Indigenous prisoners, although the rates vary between years. Logistic regression modelling showed that the odds of death in custody for Indigenous prisoners are approximately 1.29 times the odds for non-Indigenous prisoners, holding Year constant. The interaction between Year and Indigenous was not statistically significant, indicating that the relative difference between the groups remains approximately constant over time. Including Population in the model did not significantly improve the model fit, so the simpler model with Year and Indigenous was retained. However, modelling the proportion of prisoners relative to the population showed a significant interaction between Year and Indigenous, indicating that the change over time in imprisonment rates differs between the two groups. Overall, the results suggest that Indigenous prisoners have somewhat higher odds of death in custody, while a much larger disparity exists in the proportion of Indigenous people imprisoned relative to their population size.
+
+
 
 
 
