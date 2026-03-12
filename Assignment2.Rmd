@@ -7,14 +7,14 @@ fontsize: 11pt
 highlight: tango
 ---
 
-### Exercise 1
-#### a) 
+## Exercise 1
+### 1a) 
 
 ```{r}
 birth_weight <- read.csv("Birthweight.csv", header=TRUE)
 ```
 
-We define a null hypothesis (H0): smoking and low birth weight are independent. We also define an alternative hypothesis (H1): smoking and low birth weight are associated. To test these hypothesis', we apply a contingency table, and a Fisher's Test. 
+To test the relationship between smoking and low birth weight we define a null hypothesis (H0): smoking and low birth weight are independent. We also define an alternative hypothesis (H1): smoking and low birth weight are associated. To test these hypothesis', we apply a contingency table.  
 ```{r}
 table_smoke <- table(birth_weight$smoker, birth_weight$lowbwt)
 ```
@@ -22,10 +22,57 @@ table_smoke <- table(birth_weight$smoker, birth_weight$lowbwt)
 ```{r}
 fisher.test(table_smoke)
 ```
-The Fisher's test gives a p-value of 0.187. As our confidence level is a = 0.05, we see that 0.187 > 0.05. This result fails to reject the null hypothesis, which means there is no statistically significant relationship between maternal smoking anf low birth weight in this dataset. 
+A Fisher's Exact Test was used instead of the Chi-square test because some expected counts in the contingency table were below 5, making the Chi-square approximation unreliable. The Fisher's test gives a p-value of 0.187. As our confidence level is a = 0.05, we see that 0.187 > 0.05. This result fails to reject the null hypothesis, which means there is no statistically significant relationship between maternal smoking and low birth weight in this data set. 
+Interestingly, the odds ratio suggest a possible increase in the odds of low birth weight among smokers. However, the wide confidence interval indicates substantial uncertainty, likely due to the small sample size. 
+
+To test the relationship between the mother having an age of 35 or more and low birth weight we define a null hypothesis (H0): maternal age is 35 or more and low birth weight are independent. We also define an alternative hypothesis (H1): maternal age is 35 or more and low birth weight are associated. 
+```{r}
+table_mage35 <- table(birth_weight$mage35, birth_weight$lowbwt)
+```
+
+```{r}
+fisher.test(table_mage35)
+```
+The Fisher's Exact Test produced a p-value of 0.4737. Since the given significance level is a = 0.05, we observe that 0.4737 > 0.05. Therefore, we fail to reject the null hypothesis, which means there is no statistically significant relationship evidence of an association between the mother being aged 35 or older and low birth weight in this data set. 
+
+##1b)
+```{r}
+library(glmnet)
+set.seed(1)
+```
+
+```{r}
+y <- birth_weight$Birthweight
+X <- model.matrix(Birthweight ~ ., birth_weight)[, -1]
+```
+```{r}
+cv_lasso <- cv.glmnet(X, y, alpha = 1)
+best_lambda <- cv_lasso$lambda.1se
+best_lambda
+```
+```{r}
+lasso_model <- glmnet(X, y, aplha=1, lambda = best_lambda)
+coef(lasso_model)
+```
+```{r}
+full_model <- lm(Birthweight ~ ., data = birth_weight)
+summary(full_model)
+```
+```{r}
+pred_full <- predict(full_model, newdata = birth_weight)
+pred_lasso <- predict(lasso_model, newx = X)
+
+mse_full <- mean((y-pred_full)^2)
+mse_lasso <- mean((y-pred_lasso)^2)
+
+mse_full
+mse_lasso
+```
+
+The lasso model selected a subset of predictors by shrinking several coefficients to zero. The performance of the lasso model prediction was compared to a full linear regression model using the mean squared error. The full model achieved a lower MSE of 0.069, compared to the lasso model that achieved a MSE of 0.112. This indicates that the full model has better prediction accuracy on this data set, although the lasso provides a simpler model by selecting only the most relevant predictors.
+
 
 ## Exercise 2 
-
 ## 2a) Study the data by giving a few summaries (graphical or tables), make preliminary comments related to the main question.
 ```{r}
 custody <- read.table("custody.txt", header = TRUE)
@@ -43,21 +90,17 @@ aggregate(DeathRate ~ Indigenous, data = custody, mean)
 ```
 
 ```{r}
-# split the data
 indig <- subset(custody, Indigenous == "Yes")
 nonindig <- subset(custody, Indigenous == "No")
 
-# plot first line
 plot(indig$Year, indig$DeathRate,
      type = "o", pch = 19, col = "red",
      ylim = range(custody$DeathRate),
      xlab = "Year", ylab = "Death rate")
 
-# add second line
 lines(nonindig$Year, nonindig$DeathRate,
       type = "o", pch = 19, col = "blue")
 
-# add legend
 legend("topleft",
        legend = c("Indigenous", "Non-Indigenous"),
        col = c("red", "blue"),
@@ -99,11 +142,9 @@ newdata_no  <- data.frame(Year = years, Indigenous = "No")
 p_yes <- predict(model1, newdata_yes, type = "response")
 p_no  <- predict(model1, newdata_no, type = "response")
 
-# convert probabilities to odds
 odds_yes <- p_yes/(1-p_yes)
 odds_no  <- p_no/(1-p_no)
 
-# plot 
 plot(years, odds_yes, type="o", col="red", pch=19,
      ylim=range(c(odds_yes, odds_no)),
      xlab="Year", ylab="Odds of death in custody")
