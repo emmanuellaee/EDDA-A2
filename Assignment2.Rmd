@@ -10,6 +10,20 @@ highlight: tango
 ### Exercise 1
 #### a) 
 
+```{r}
+birth_weight <- read.csv("Birthweight.csv", header=TRUE)
+```
+
+We define a null hypothesis (H0): smoking and low birth weight are independent. We also define an alternative hypothesis (H1): smoking and low birth weight are associated. To test these hypothesis', we apply a contingency table, and a Fisher's Test. 
+```{r}
+table_smoke <- table(birth_weight$smoker, birth_weight$lowbwt)
+```
+
+```{r}
+fisher.test(table_smoke)
+```
+The Fisher's test gives a p-value of 0.187. As our confidence level is a = 0.05, we see that 0.187 > 0.05. This result fails to reject the null hypothesis, which means there is no statistically significant relationship between maternal smoking anf low birth weight in this dataset. 
+
 
 
 
