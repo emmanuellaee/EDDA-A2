@@ -7,6 +7,10 @@ fontsize: 11pt
 highlight: tango
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.width=4, fig.height=3.3)
+```
+
 ## Exercise 1
 ## 1a) 
 
