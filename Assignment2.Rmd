@@ -224,7 +224,7 @@ fit <- nls(log(y) ~ theta1 - theta2 * x1 * exp(-theta3 * x2),
            control = nls.control(maxiter = 1000))
 
 summary(fit)
-
+RSS <- sum(residuals(fit)^2)
 SS_total <- sum((log(nonlin_regr_nelson$y) - mean(log(nonlin_regr_nelson$y)))^2)
 R2 <- 1 - RSS/SS_total
 cat("R² =", R2)
