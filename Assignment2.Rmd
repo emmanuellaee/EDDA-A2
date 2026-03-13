@@ -8,7 +8,7 @@ highlight: tango
 ---
 
 ## Exercise 1
-### 1a) 
+## 1a) 
 
 ```{r}
 birth_weight <- read.csv("Birthweight.csv", header=TRUE)
@@ -35,7 +35,7 @@ fisher.test(table_mage35)
 ```
 The Fisher's Exact Test produced a p-value of 0.4737. Since the given significance level is a = 0.05, we observe that 0.4737 > 0.05. Therefore, we fail to reject the null hypothesis, which means there is no statistically significant relationship evidence of an association between the mother being aged 35 or older and low birth weight in this data set. 
 
-##1b)
+## 1b)
 ```{r}
 library(glmnet)
 set.seed(1)
@@ -195,7 +195,114 @@ To investigate whether Year and Indigenous status affect the proportion of priso
 ## 2f) Combine all your findings so far to present your final conclusion(s) for the Royal Commission on Aboriginal Deaths in Custody.
 The exploratory analysis suggested that the death rate among prisoners is generally higher for Indigenous prisoners than for non-Indigenous prisoners, although the rates vary between years. Logistic regression modelling showed that the odds of death in custody for Indigenous prisoners are approximately 1.29 times the odds for non-Indigenous prisoners, holding Year constant. The interaction between Year and Indigenous was not statistically significant, indicating that the relative difference between the groups remains approximately constant over time. Including Population in the model did not significantly improve the model fit, so the simpler model with Year and Indigenous was retained. However, modelling the proportion of prisoners relative to the population showed a significant interaction between Year and Indigenous, indicating that the change over time in imprisonment rates differs between the two groups. Overall, the results suggest that Indigenous prisoners have somewhat higher odds of death in custody, while a much larger disparity exists in the proportion of Indigenous people imprisoned relative to their population size.
 
+## Exercise 3
+## 3a) 
+```{r echo=FALSE}
+nonlin_regr_nelson <- read.table("nonlin_regr_nelson.txt", header = TRUE)
+```
 
+```{r}
+colors <- c("180" = "blue", "225" = "green", "250" = "orange", "275" = "red")
+plot(nonlin_regr_nelson$x1, log(nonlin_regr_nelson$y),
+     col  = colors[as.character(nonlin_regr_nelson$x2)],
+     xlab =  "Time", ylab = "Log(Y)",
+     main = "Log(Y) vs Time"
+     )
 
+legend("bottomleft",
+       legend = paste("Temp =", c(180, 225, 250, 275), "°C"),
+       col    = c("blue","green","orange","red"),
+       pch    = 19,
+       cex    = 0.6)   
+```
+The above scatter plot shows the effect of time and temperature on the dialectric breakdown strength. It is clear from the plot that breakdown strength decreases with time and that there is a strong relation between temperature and the effect of time on the breakdown strength, with lower temperatures remaining similar across time, while higher temperatures, particularly around 275 degrees, drop more drastically over time. This suggests that degradation accelerates with temperature increase.
 
+```{r}
+fit <- nls(log(y) ~ theta1 - theta2 * x1 * exp(-theta3 * x2),
+           data  = nonlin_regr_nelson,
+           start = list(theta1 = 2.9, theta2 = 0.001, theta3 = -0.01),
+           control = nls.control(maxiter = 1000))
 
+summary(fit)
+
+SS_total <- sum((log(nonlin_regr_nelson$y) - mean(log(nonlin_regr_nelson$y)))^2)
+R2 <- 1 - RSS/SS_total
+cat("R² =", R2)
+```
+```{r}
+plot(fitted(fit), residuals(fit),
+     xlab="Fitted values", ylab="Residuals",
+     main="Residuals vs Fitted")
+```
+The proposed initial values are as follows: theta1 = 2.9, theta2 = 0.001, theta3 = -0.01
+The NLS estimates are: theta1 = 2.591, theta2 = 5.618 * 10^-9, theta3 = -0.058 with a residual standard error of 0.174 meaning an estimated variance of (0.174)^2 = 0.030.
+The regression model is able to capture the relationship between the breakdown strength degradation, temperature and time. With R² = 0.93, the model is able to explain 93% of variation indicating strong predictive power and overall a strong model fit. The residuals vs fitted plot shows residuals scattered around zero, indicating that the model captures the overall structure of the data reasonably well. Some clustering is observed at higher fitted values, which likely reflects multiple observations having the same combinations of time and temperature.
+
+## 3b)
+```{r}
+# From Variance-covariance matrix, get the variance and convert to SE
+vcov_mat <- vcov(fit)
+se <- sqrt(diag(vcov_mat))
+est_params <- coef(fit)
+
+z  <- (est_params["theta1"] - 2.5) / se["theta1"]
+p <- 2 * pnorm(-abs(z))
+
+cat("Z =", z, "\n")
+cat("p-value     =", p, "\n")
+
+res <- data.frame(
+  Estimate = est_params,
+  SE       = se,
+  Lower    = est_params - 1.96 * se,
+  Upper    = est_params + 1.96 * se
+)
+
+print(signif(res, 3))
+```
+With a p value less than 0.05, we can reject the null hypothesis as there is significant evidence to suggest that theta1 is not equal to 2.5.The 95% confidence interval range is [2.55, 2.63], which excludes 2.5.
+
+## 3c
+```{r}
+x1 <- 57
+x2 <- 260
+
+pred_log_y <- est_params["theta1"] - est_params["theta2"] * x1 * 
+         exp(-est_params["theta3"] * x2)
+
+grad <- c(
+  1,                                                        
+  -x1 * exp(-est_params["theta3"] * x2),                                 
+  est_params["theta2"] * x1 * x2 * exp(-est_params["theta3"] * x2)       
+)
+
+# Variance and SE using delta method formula
+var_f <- t(grad) %*% vcov_mat %*% grad
+se_f  <- sqrt(var_f)
+
+lower <- pred_log_y - 1.96 * se_f
+upper <- pred_log_y + 1.96 * se_f
+
+cat("Predicted log(y) =", round(pred_log_y,3), "\n")
+cat("SE =", round(se_f,3), "\n")
+cat("95% Confidence Interval: [", round(lower,3), ",", round(upper,3), "]\n")
+```
+By means of the delta method formula, the estimated mean of log(y) at x = (57,260) is 1.542. The corresponding 95% confidence interval is [1.43, 1.66]. 
+
+## 3d
+```{r}
+fit_reduced <- nls(log(y) ~ 2.5 - theta2 * x1 * exp(-theta3 * x2),
+                   data  = nonlin_regr_nelson,
+                   start = list(theta2 = est_params["theta2"],
+                                theta3 = est_params["theta3"]),
+                   control = nls.control(maxiter = 1000))
+
+summary(fit_reduced)
+
+rss_full    <- sum(residuals(fit)^2)
+rss_reduced <- sum(residuals(fit_reduced)^2)
+
+anova_result <- anova(fit_reduced, fit)
+print(anova_result)
+```
+In order to investigate whether the reduced model with theta1 = 2.5 is appropriate, a comparison is carried out between the full and reduced model using anova test. As the residual sum of squares for the reduced model (4.486) is larger than that of the full model (3.798), it can be concluded that the reduced model fits the data less closely than the full model. Furthermore, the F-value is 22.663 with p-value = 5.25*10^-6 which is less than 0.05 so we can reject the null hypothesis and conclude that the the reduced model is not appropriate as it worsens the model fit. 
