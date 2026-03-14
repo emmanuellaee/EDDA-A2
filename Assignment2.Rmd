@@ -8,7 +8,7 @@ highlight: tango
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(fig.width=4, fig.height=3.3)
+knitr::opts_chunk$set(fig.width=4, fig.height=3.5)
 ```
 
 ## Exercise 1
@@ -111,6 +111,7 @@ legend("topleft",
        pch = 19,
        lty = 1)
 ```
+
 The number of prisoners increases slightly from 1990 to 1995 for both Indigenous and non-Indigenous groups, although the Indigenous prison population is much smaller. The number of deaths fluctuates across years, with higher raw counts for non-Indigenous prisoners due to their much larger prison population. A more informative measure is the death rate (Deaths/Prisoners). The exploratory analysis suggests that the death rate is generally higher for Indigenous prisoners, although it varies considerably from year to year. These observations motivate a formal statistical analysis using logistic regression to determine whether the difference between the groups is statistically significant.
 
 ## 2b) 
@@ -161,6 +162,7 @@ legend("topleft",
        pch=19,
        lty=1)
 ```
+
 The predicted odds from 1990 to 1995 were plotted for both groups, showing higher odds for Indigenous prisoners across all years. The difference between the groups remains approximately constant over time.
 
 
@@ -172,9 +174,9 @@ model_pop <- glm(cbind(Deaths, Prisoners - Deaths) ~ Year + Indigenous + Populat
                  family = binomial)
 
 anova(model1, model_pop, test="Chisq")
-```
-```{r}
-model_pop_int <- glm(cbind(Deaths, Prisoners - Deaths) ~ Year + Indigenous + Population + Indigenous:Population,
+
+model_pop_int <- glm(cbind(Deaths, Prisoners - Deaths) ~ Year + 
+                    Indigenous + Population + Indigenous:Population,
                      data = custody,
                      family = binomial)
 
@@ -214,12 +216,13 @@ plot(nonlin_regr_nelson$x1, log(nonlin_regr_nelson$y),
      )
 
 legend("bottomleft",
-       legend = paste("Temp =", c(180, 225, 250, 275), "°C"),
+       legend = paste("Temp =", c(180, 225, 250, 275), "C"),
        col    = c("blue","green","orange","red"),
        pch    = 19,
        cex    = 0.6)   
 ```
-The above scatter plot shows the effect of time and temperature on the dialectric breakdown strength. It is clear from the plot that breakdown strength decreases with time and that there is a strong relation between temperature and the effect of time on the breakdown strength, with lower temperatures remaining similar across time, while higher temperatures, particularly around 275 degrees, drop more drastically over time. This suggests that degradation accelerates with temperature increase.
+
+The scatter plot shows the effect of time and temperature on dialectric breakdown strength. It can be observed that breakdown strength generally decreases with time and that there is a strong relation between temperature. At lower temperatures, the breakdown strength remains rather stable and does not decrease drastically, whereas at higher temperatures, particularly around 275 degrees, the breakdown strength drops more rapidly over time. This suggests that degradation accelerates with temperature increase.
 
 ```{r}
 fit <- nls(log(y) ~ theta1 - theta2 * x1 * exp(-theta3 * x2),
@@ -228,32 +231,29 @@ fit <- nls(log(y) ~ theta1 - theta2 * x1 * exp(-theta3 * x2),
            control = nls.control(maxiter = 1000))
 
 summary(fit)
-RSS <- sum(residuals(fit)^2)
-SS_total <- sum((log(nonlin_regr_nelson$y) - mean(log(nonlin_regr_nelson$y)))^2)
-R2 <- 1 - RSS/SS_total
-cat("R² =", R2)
-```
-```{r}
+
 plot(fitted(fit), residuals(fit),
      xlab="Fitted values", ylab="Residuals",
      main="Residuals vs Fitted")
+abline(h = 0, lty = 3)
 ```
+
 The proposed initial values are as follows: theta1 = 2.9, theta2 = 0.001, theta3 = -0.01
-The NLS estimates are: theta1 = 2.591, theta2 = 5.618 * 10^-9, theta3 = -0.058 with a residual standard error of 0.174 meaning an estimated variance of (0.174)^2 = 0.030.
-The regression model is able to capture the relationship between the breakdown strength degradation, temperature and time. With R² = 0.93, the model is able to explain 93% of variation indicating strong predictive power and overall a strong model fit. The residuals vs fitted plot shows residuals scattered around zero, indicating that the model captures the overall structure of the data reasonably well. Some clustering is observed at higher fitted values, which likely reflects multiple observations having the same combinations of time and temperature.
+The NLS estimates are: theta1 = 2.591, theta2 = 5.618 * 10^-9, theta3 = -0.058 with a residual standard error of 0.174, corresponding to an estimated error variance of (0.174)^2 = 0.030.
+The model is able to capture the relationship between the dialectric breakdown strength, temperature and time really well. The residuals vs fitted plot shows residuals scattered around zero, indicating that the model captures the overall structure of the data reasonably well. Some clustering is observed at higher fitted values, which likely reflects multiple observations at the same combinations of time and temperature.
 
 ## 3b)
 ```{r}
-# From Variance-covariance matrix, get the variance and convert to SE
 vcov_mat <- vcov(fit)
 se <- sqrt(diag(vcov_mat))
 est_params <- coef(fit)
 
 z  <- (est_params["theta1"] - 2.5) / se["theta1"]
 p <- 2 * pnorm(-abs(z))
-
-cat("Z =", z, "\n")
-cat("p-value     =", p, "\n")
+c(
+  Z = round(z, 3),
+  p_value = signif(p, 3)
+)
 
 res <- data.frame(
   Estimate = est_params,
@@ -264,7 +264,7 @@ res <- data.frame(
 
 print(signif(res, 3))
 ```
-With a p value less than 0.05, we can reject the null hypothesis as there is significant evidence to suggest that theta1 is not equal to 2.5.The 95% confidence interval range is [2.55, 2.63], which excludes 2.5.
+Since p-value is less than 0.05, we can reject the null hypothesis as there is significant evidence to suggest that theta1 is not equal to 2.5.The 95% confidence interval is [2.55, 2.63], which excludes 2.5.
 
 ## 3c
 ```{r}
@@ -280,18 +280,20 @@ grad <- c(
   est_params["theta2"] * x1 * x2 * exp(-est_params["theta3"] * x2)       
 )
 
-# Variance and SE using delta method formula
-var_f <- t(grad) %*% vcov_mat %*% grad
-se_f  <- sqrt(var_f)
+var_pred <- t(grad) %*% vcov_mat %*% grad
+se_pred  <- sqrt(var_pred)
 
-lower <- pred_log_y - 1.96 * se_f
-upper <- pred_log_y + 1.96 * se_f
+lower <- pred_log_y - 1.96 * se_pred
+upper <- pred_log_y + 1.96 * se_pred
 
-cat("Predicted log(y) =", round(pred_log_y,3), "\n")
-cat("SE =", round(se_f,3), "\n")
-cat("95% Confidence Interval: [", round(lower,3), ",", round(upper,3), "]\n")
+c(
+  Estimate = round(pred_log_y, 3),
+  SE = round(se_pred, 3),
+  Lower = round(lower, 3),
+  Upper = round(upper, 3)
+)
 ```
-By means of the delta method formula, the estimated mean of log(y) at x = (57,260) is 1.542. The corresponding 95% confidence interval is [1.43, 1.66]. 
+Using the delta method, the estimated mean of log(y) at x = (57,260) is 1.542. The corresponding 95% confidence interval is [1.427, 1.656]. 
 
 ## 3d
 ```{r}
@@ -305,8 +307,6 @@ summary(fit_reduced)
 
 rss_full    <- sum(residuals(fit)^2)
 rss_reduced <- sum(residuals(fit_reduced)^2)
-
-anova_result <- anova(fit_reduced, fit)
-print(anova_result)
+anova(fit_reduced, fit)
 ```
-In order to investigate whether the reduced model with theta1 = 2.5 is appropriate, a comparison is carried out between the full and reduced model using anova test. As the residual sum of squares for the reduced model (4.486) is larger than that of the full model (3.798), it can be concluded that the reduced model fits the data less closely than the full model. Furthermore, the F-value is 22.663 with p-value = 5.25*10^-6 which is less than 0.05 so we can reject the null hypothesis and conclude that the the reduced model is not appropriate as it worsens the model fit. 
+In order to investigate whether the reduced model with theta1 = 2.5 is appropriate, a comparison is carried out between the full and reduced model using an ANOVA test. As the residual sum of squares for the reduced model (4.486) is larger than that of the full model (3.798), it can be concluded that the reduced model fits the data less closely than the full model. Furthermore, the F-value is 22.663 with p-value = 5.25*10^-6 which is less than 0.05 so we reject the null hypothesis and conclude that the the reduced model is not appropriate as it significantly worsens the model fit. 
